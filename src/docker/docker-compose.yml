@@ -1,0 +1,171 @@
+# NOTE:
+# - "version" is obsolete in modern compose; removed to avoid warnings.
+# - Core services (minio, iceberg-rest, redis, postgres) run by default.
+# - Optional services are under profiles: ui, notebook, scm, sparkcluster, executor
+
+x-data-dir: &data-dir ${DATA_DIR:-./data}
+
+services:
+  # ---------------------------
+  # 0. MinIO init (create bucket)
+  # ---------------------------
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      - minio
+    networks:
+      - dev-net
+    entrypoint: >
+      /bin/sh -c "
+      until (mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-admin} ${MINIO_ROOT_PASSWORD:-password}); do
+        echo 'waiting for minio...'; sleep 2;
+      done;
+      mc mb -p local/warehouse || true;
+      mc anonymous set none local/warehouse || true;
+      echo 'minio bucket warehouse ready';
+      "
+
+  # ---------------------------
+  # 1. MinIO (S3 Storage)
+  # ---------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9008:9000"
+      - "9009:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-admin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-password}
+    volumes:
+      - ${DATA_DIR:-./data}/minio:/data
+    networks:
+      - dev-net
+
+  # ---------------------------
+  # 2. Iceberg REST Catalog
+  # ---------------------------
+  iceberg-rest:
+    image: tabulario/iceberg-rest:latest
+    container_name: iceberg-rest
+    depends_on:
+      - minio
+      - minio-init
+    ports:
+      - "8181:8181"
+    networks:
+      - dev-net
+    environment:
+      - CATALOG_WAREHOUSE=s3://warehouse/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://minio:9000
+      - CATALOG_S3_PATH__STYLE__ACCESS=true
+
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-admin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-password}
+      - AWS_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_EC2_METADATA_DISABLED=true
+      - AWS_METADATA_SERVICE_TIMEOUT=1
+      - AWS_METADATA_SERVICE_NUM_ATTEMPTS=1
+
+      - CATALOG_CATALOG__IMPL=org.apache.iceberg.jdbc.JdbcCatalog
+      - CATALOG_URI=jdbc:sqlite:file:/var/lib/iceberg/catalog.db
+      - CATALOG_JDBC_USER=user
+      - CATALOG_JDBC_PASSWORD=password
+    volumes:
+      - ${DATA_DIR:-./data}/iceberg/catalog:/var/lib/iceberg
+
+  # ---------------------------
+  # 3. Redis (Queue Backend)
+  # ---------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: validation-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - dev-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------
+  # 4. PostgreSQL (Result Storage)
+  # ---------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: validation-postgres
+    environment:
+      - POSTGRES_USER=validator
+      - POSTGRES_PASSWORD=validator_secret
+      - POSTGRES_DB=validation_results
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init_db:/docker-entrypoint-initdb.d
+    networks:
+      - dev-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U validator -d validation_results"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------
+  # 5. Validation Executor
+  # ---------------------------
+  validation-executor:
+    profiles: ["executor"]
+    image: python:3.9-slim-bookworm
+    container_name: validation-executor
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      iceberg-rest:
+        condition: service_started
+    working_dir: /app
+    volumes:
+      - ../..:/app
+    networks:
+      - dev-net
+    environment:
+      - REDIS_URL=redis://validation-redis:6379/0
+      - POSTGRES_HOST=validation-postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=validation_results
+      - POSTGRES_USER=validator
+      - POSTGRES_PASSWORD=validator_secret
+      - ICEBERG_REST_URI=http://iceberg-rest:8181
+      - ICEBERG_S3_ENDPOINT=http://minio:9000
+      - ICEBERG_WAREHOUSE=s3a://warehouse/
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-admin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-password}
+      - AWS_REGION=us-east-1
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_EC2_METADATA_DISABLED=true
+    command: >
+      /bin/bash -lc "
+        python -m pip install -U pip &&
+        pip install pyyaml pydantic redis psycopg2-binary &&
+        python -u src/executor_runner.py --config config/framework.yaml --worker-id worker-1
+      "
+
+networks:
+  dev-net:
+    name: validation-net
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

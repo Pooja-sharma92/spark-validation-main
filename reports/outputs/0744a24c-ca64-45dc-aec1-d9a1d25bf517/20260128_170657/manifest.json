@@ -1,0 +1,9 @@
+{
+  "job_id": "0744a24c-ca64-45dc-aec1-d9a1d25bf517",
+  "job_path": "/app/jobs/CBS_INVM_CDC_PACKED.py",
+  "run_id": "20260128_170657",
+  "created_at_utc": "2026-01-28T17:06:58Z",
+  "exit_code": 0,
+  "duration_seconds": 0.9200522899627686,
+  "sql_calls": 0
+}

@@ -1,0 +1,149 @@
+job_name: CBS_INVM_CDC_PACKED
+source_xml: /tmp/spark-validator/.pre_execution/xml/CBS_INVM_CDC_PACKED.xml
+parameters:
+  -
+    name: WrkTableName
+    default: LDICBSSBI.INVM_P1
+    prompt: WrkTableName
+  -
+    name: TargetTableName
+    default: SDICBSSBI.INVM_PACKED
+    prompt: TargetTableName
+  -
+    name: BusinessDate
+    default: 2024-02-15
+    prompt: BusinessDate
+  -
+    name: PCS_ParameterSet
+    default: (As pre-defined)
+    prompt: PCS_ParameterSet parameters
+  -
+    name: CDC_INVM_ParameterSet
+    default: (As pre-defined)
+    prompt: CDC_INVM_ParameterSet parameters
+  -
+    name: $APT_GRID_COMPUTENODES
+    default: 18
+    prompt: COMPUTENODES - Number of Compute Nodes
+  -
+    name: $APT_GRID_QUEUE
+    default: sbi_medium
+    prompt: QUEUE - Resource Manager Queue name
+  -
+    name: Prm_Rej_ParamSet
+    default: (As pre-defined)
+    prompt: Prm_Rej_ParamSet parameters
+  -
+    name: P_Tbl_Nm
+    default: INVM_PACKED
+    prompt: P_Tbl_Nm
+  -
+    name: PCS_ParameterSet
+    default: (As pre-defined)
+    prompt: PCS_ParameterSet parameters
+  -
+    name: CDC_INVM_ParameterSet
+    default: (As pre-defined)
+    prompt: CDC_INVM_ParameterSet parameters
+  -
+    name: Prm_Rej_ParamSet
+    default: (As pre-defined)
+    prompt: Prm_Rej_ParamSet parameters
+  -
+    name: P_Tbl_Nm
+    default: PACKED_TO_INVM
+    prompt: P_Tbl_Nm
+  -
+    name: PCS_ParameterSet
+    default: (As pre-defined)
+    prompt: PCS_ParameterSet parameters
+  -
+    name: CDC_INVM_ParameterSet
+    default: (As pre-defined)
+    prompt: CDC_INVM_ParameterSet parameters
+  -
+    name: Prm_Rej_ParamSet
+    default: (As pre-defined)
+    prompt: Prm_Rej_ParamSet parameters
+  -
+    name: P_Tbl_Nm
+    default: PACKED_TO_INVM_T1
+    prompt: P_Tbl_Nm
+  -
+    name: $APT_DISABLE_COMBINATION
+    default: True
+    prompt: Disable operator combination
+  -
+    name: $APT_DUMP_SCORE
+    default: False
+    prompt: Report score
+  -
+    name: PCS_ParameterSet
+    default: (As pre-defined)
+    prompt: PCS_ParameterSet parameters
+  -
+    name: CDC_INVM_ParameterSet
+    default: (As pre-defined)
+    prompt: CDC_INVM_ParameterSet parameters
+  -
+    name: Prm_Rej_ParamSet
+    default: (As pre-defined)
+    prompt: Prm_Rej_ParamSet parameters
+  -
+    name: P_Tbl_Nm
+    default: DEPP_INVM
+    prompt: P_Tbl_Nm
+  -
+    name: PCS_ParameterSet
+    default: (As pre-defined)
+    prompt: PCS_ParameterSet parameters
+  -
+    name: CDC_INVM_ParameterSet
+    default: (As pre-defined)
+    prompt: CDC_INVM_ParameterSet parameters
+outputs:
+  -
+    stage_name: Trf_Rej
+    file_template: "\\\\0\\\\file\\#Prm_Rej_ParamSet.REJ_BASE_PATH#/#Prm_Rej_ParamSet.PATH_CBS#/#Prm_Rej_ParamSet.TRF_REJ_LOC#_#P_Tbl_Nm#_#PCS_ParameterSet.$JpBusinessDate#.txt\\0"
+    apt_schema_record: 
+    pin_id: V76S4P1
+  -
+    stage_name: Tgt_Invm
+    file_template: "\\\\0\\\\file\\#Prm_Rej_ParamSet.REJ_BASE_PATH#/#Prm_Rej_ParamSet.PATH_CBS#/#Prm_Rej_ParamSet.TGT_REJ_LOC#_#P_Tbl_Nm#_#PCS_ParameterSet.$JpBusinessDate#.txt\\0"
+    apt_schema_record: 
+    pin_id: V76S6P1
+  -
+    stage_name: Trf_Rej
+    file_template: "\\\\0\\\\file\\#Prm_Rej_ParamSet.REJ_BASE_PATH#/#Prm_Rej_ParamSet.PATH_CBS#/#Prm_Rej_ParamSet.TRF_REJ_LOC#_#P_Tbl_Nm#_#PCS_ParameterSet.$JpBusinessDate#.txt\\0"
+    apt_schema_record: 
+    pin_id: V76S4P1
+  -
+    stage_name: Tgt_Invm
+    file_template: "\\\\0\\\\file\\#Prm_Rej_ParamSet.REJ_BASE_PATH#/#Prm_Rej_ParamSet.PATH_CBS#/#Prm_Rej_ParamSet.TGT_REJ_LOC#_#P_Tbl_Nm#_#PCS_ParameterSet.$JpBusinessDate#.txt\\0"
+    apt_schema_record: 
+    pin_id: V76S6P1
+  -
+    stage_name: Trf_Rej
+    file_template: "\\\\0\\\\file\\#Prm_Rej_ParamSet.REJ_BASE_PATH#/#Prm_Rej_ParamSet.PATH_CBS#/#Prm_Rej_ParamSet.TRF_REJ_LOC#_#P_Tbl_Nm#_#PCS_ParameterSet.$JpBusinessDate#.txt\\0"
+    apt_schema_record: 
+    pin_id: V76S4P1
+  -
+    stage_name: Tgt_Invm
+    file_template: "\\\\0\\\\file\\#Prm_Rej_ParamSet.REJ_BASE_PATH#/#Prm_Rej_ParamSet.PATH_CBS#/#Prm_Rej_ParamSet.TGT_REJ_LOC#_#P_Tbl_Nm#_#PCS_ParameterSet.$JpBusinessDate#.txt\\0"
+    apt_schema_record: 
+    pin_id: V76S6P1
+  -
+    stage_name: DEPP_Reject
+    file_template: "\\\\0\\\\file\\#Prm_Rej_ParamSet.REJ_BASE_PATH#/#Prm_Rej_ParamSet.PATH_CBS#/#Prm_Rej_ParamSet.TGT_REJ_LOC#_#P_Tbl_Nm#_#PCS_ParameterSet.$JpBusinessDate#.txt\\0"
+    apt_schema_record: 
+    pin_id: V0S11P1
+  -
+    stage_name: Trf_of_DEPP_Reject
+    file_template: "\\\\0\\\\file\\#Prm_Rej_ParamSet.REJ_BASE_PATH#/#Prm_Rej_ParamSet.PATH_CBS#/#Prm_Rej_ParamSet.TRF_REJ_LOC#_#P_Tbl_Nm#_#PCS_ParameterSet.$JpBusinessDate#.txt\\0"
+    apt_schema_record: 
+    pin_id: V36S0P1
+validation:
+  checks:
+    - output_file_exists
+    - schema_matches_expected_if_parquet_or_dataframe
+    - row_count_nonzero_if_expected

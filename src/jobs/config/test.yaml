@@ -1,0 +1,47 @@
+# Test Environment Configuration
+# This file overrides base.yaml settings for testing
+
+metadata:
+  environment: "test"
+
+spark:
+  master: "local[2]"  # Run locally with 2 cores for testing
+
+  catalogs:
+    my_catalog:
+      type: "rest"  # Use REST catalog for Docker environment
+      uri: "http://iceberg-rest:8181"  # REST catalog endpoint (use localhost:8181 outside Docker)
+      warehouse: "s3a://warehouse/"  # S3/MinIO warehouse path
+      cache_enabled: false
+
+  performance:
+    shuffle_partitions: 20  # Minimal partitions for fast tests
+
+databases:
+  source_schema: "test_ibm"
+  dim_schema: "test_gdm"
+  target_schema: "test_output"
+
+tables:
+  sources:
+    # Test environment uses mock table names
+    loan_master: "mock_loan_master"
+    psl_lookup: "mock_psl_lookup"
+    advance_detail: "mock_advance_detail"
+    loan_account_detail: "mock_loan_account_detail"
+    customer_balance: "mock_customer_balance"
+    loan_customer_balance: "mock_loan_customer_balance"
+    branch_master: "mock_branch_master"
+    date_dimension: "mock_date_dimension"
+
+  target:
+    fact_table: "mock_fact_table"
+
+logging:
+  level: "DEBUG"  # Verbose logging for test debugging
+  log_schemas: false  # Reduce noise in tests
+  log_row_counts: true
+
+output:
+  reject_file_path: "/tmp/test-output"
+  write_mode: "overwrite"

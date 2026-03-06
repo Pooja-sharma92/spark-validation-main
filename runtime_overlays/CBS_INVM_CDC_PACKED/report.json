@@ -1,0 +1,19 @@
+{
+  "job_name": "CBS_INVM_CDC_PACKED",
+  "required_args_detected": [
+    "BusinessDate",
+    "CDC_INVM_ParameterSet",
+    "PCS_ParameterSet",
+    "P_Tbl_Nm",
+    "Prm_Rej_ParamSet",
+    "TargetTableName",
+    "WrkTableName"
+  ],
+  "provided": {
+    "CDC_INVM_ParameterSet": "/app/runtime_overlays/CBS_INVM_CDC_PACKED/params/CDC_INVM_ParameterSet.json",
+    "PCS_ParameterSet": "/app/runtime_overlays/CBS_INVM_CDC_PACKED/params/PCS_ParameterSet.json",
+    "Prm_Rej_ParamSet": "/app/runtime_overlays/CBS_INVM_CDC_PACKED/params/Prm_Rej_ParamSet.json"
+  },
+  "stubs_created": [],
+  "overlay_dir": "/app/runtime_overlays/CBS_INVM_CDC_PACKED"
+}

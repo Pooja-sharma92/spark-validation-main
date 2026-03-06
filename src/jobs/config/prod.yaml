@@ -1,0 +1,51 @@
+# Production Environment Configuration
+# This file overrides base.yaml settings for production
+
+metadata:
+  environment: "prod"
+
+spark:
+  master: "yarn"  # Use YARN cluster manager
+
+  catalogs:
+    my_catalog:
+      type: "hive"  # Use Hive metastore for production
+      uri: "${HIVE_METASTORE_URI}"  # Production metastore URI
+      warehouse: "${ICEBERG_WAREHOUSE}"  # Production warehouse path
+      cache_enabled: false
+
+  performance:
+    shuffle_partitions: 200  # Standard partitions for production
+    files_max_partition_bytes: 134217728  # 128MB
+    files_open_cost_in_bytes: 4194304  # 4MB
+
+databases:
+  source_schema: "IBM_TEST"  # Production source schema
+  dim_schema: "GDMSBI"  # Production dimension schema
+  target_schema: "VIBMAVPNE0"  # Production target schema
+
+tables:
+  sources:
+    # Production table names
+    loan_master: "LOAN_MASTER"
+    psl_lookup: "CCOD_LON_PSL"
+    advance_detail: "BLDVAA_UAT"
+    loan_account_detail: "LON_ACCT_DTL_TBL"
+    customer_balance: "CUST_TOT_BALANCE"
+    loan_customer_balance: "LON_CUST_TOT_BALANCE"
+    branch_master: "BRANCH_MASTER_DIM"
+    date_dimension: "DT_DIM"
+
+  target:
+    fact_table: "LON_AGREEMENT_WEEKLY_FACT"
+
+logging:
+  level: "INFO"  # Standard logging for production
+  format: "json"  # JSON format for log aggregation
+  log_schemas: false  # Reduce log volume
+  log_row_counts: true  # Monitor data volumes
+  log_execution_time: true
+
+output:
+  reject_file_path: "${REJECT_FILE_PATH}"  # Production reject path
+  write_mode: "overwrite"

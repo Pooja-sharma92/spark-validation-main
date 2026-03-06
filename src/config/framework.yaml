@@ -1,0 +1,338 @@
+# Spark Job Validation Framework Configuration
+# Environment variables can be used with ${VAR_NAME} or ${VAR_NAME:default}
+
+name: "spark-validator"
+version: "1.0.0"
+
+# Spark Jobs Directory Configuration
+# All synced repos and job files will be stored under this path
+jobs:
+  base_path: "${JOBS_BASE_PATH:/Users/xuym/Documents/GitHubLocal/sbi}"
+
+# Redis Configuration
+redis:
+  url: "${REDIS_URL:redis://localhost:6379/0}"
+  max_connections: 10
+
+# PostgreSQL Configuration (for result storage)
+postgres:
+  host: "${POSTGRES_HOST:localhost}"
+  port: ${POSTGRES_PORT:5433}
+  database: "${POSTGRES_DB:validation_results}"
+  user: "${POSTGRES_USER:validator}"
+  password: "${POSTGRES_PASSWORD:validator_secret}"
+
+# Queue Management
+queue:
+  max_concurrent: 5  # Maximum parallel validations
+  dedup_window_seconds: 60  # Deduplication window
+  job_ttl_seconds: 86400  # Job metadata TTL (24 hours)
+
+  # Rate limits per priority level (null = no limit)
+  rate_limits:
+    0: null  # CRITICAL: No rate limit
+    1:  # MANUAL
+      tokens_per_minute: 10
+      burst_size: 5
+    2:  # CI_CD
+      tokens_per_minute: 30
+      burst_size: 10
+    3:  # BATCH
+      tokens_per_minute: 100
+      burst_size: 20
+
+# Backpressure Thresholds
+backpressure:
+  warning_threshold: 50
+  critical_threshold: 100
+  reject_threshold: 200
+
+# Validation Pipeline
+# Note: Job classification happens during repo sync (not in validation stages)
+#       to avoid redundant LLM calls. See ai.classifier settings below.
+validation:
+  stages:
+    - name: "pre_execution"
+      enabled: false
+      blocking: false
+      timeout_seconds: 120
+      # Part-3 options (optional overrides)
+      out_dir: "metadata/out"
+      gen_dir: "metadata/generated"
+
+    - name: "syntax"
+      enabled: true
+      blocking: true
+      timeout_seconds: 60
+
+    - name: "imports"
+      enabled: true
+      blocking: false  # Warnings only
+      timeout_seconds: 60
+
+    - name: "sql"
+      enabled: true
+      blocking: true
+      timeout_seconds: 60
+
+    - name: "logic"
+      enabled: true
+      blocking: true
+      timeout_seconds: 60
+      rules:
+        - bare_except
+        - collect_without_limit
+        - hardcoded_credentials
+        - s3a_protocol
+        - print_statements
+
+    - name: "execution"
+      enabled: true
+      blocking: false
+      auto_call_run: true
+      show_dataframe: true
+      max_rows: 20
+      timeout_seconds: 600
+
+# Trigger Sources
+triggers:
+  # Git Webhook (Gitea/GitHub)
+  git:
+    enabled: true
+    secret: "${GIT_WEBHOOK_SECRET:}"
+    events:
+      - "push"
+      - "pull_request"
+    priority_map:
+      "hotfix/*": 0  # CRITICAL
+      "release/*": 1  # MANUAL priority
+      "main": 2       # CI_CD priority
+      "develop": 2
+      "feature/*": 3  # BATCH priority
+
+  # File System Watcher (for local file changes)
+  file_watcher:
+    enabled: true
+    paths:
+      - "./jobs/**/*.py"
+      - "/opt/spark-jobs/**/*.py"
+    ignore_patterns:
+      - "**/test_*.py"
+      - "**/__pycache__/**"
+      - "**/.git/**"
+    debounce_seconds: 5.0
+
+  # Git Poller (lightweight alternative to webhooks)
+  # Use when webhooks are not available (firewall, local dev)
+  # Supports multiple remote repositories with automatic sync
+  git_poller:
+    enabled: true
+    interval_seconds: 300  # 5 minutes
+    file_patterns:
+      - "*.py"
+      - "*.sql"
+
+    # Multiple repositories to monitor
+    # Each repo will be cloned/synced to: {jobs.base_path}/{local_name}
+    repositories:
+      - name: "domain-customer"
+        url: "https://github.ibm.com/sbi-validation/domain-customer.git"
+        branches:
+          - "main"
+        # Optional: subdirectory within repo containing jobs
+        jobs_subdir: "domains/customer/jobs"
+        # Python paths relative to repo root (for module imports)
+        python_path:
+          - "."        # repo root
+          - "shared"   # shared modules
+        # Testdata configuration for execution stage
+        testdata:
+          enabled: true
+          base_dir: "testdata/customer"  # relative to repo root
+          # Auto-discover input files by job name
+          # Pattern: {base_dir}/{job_name}/input/*.csv
+          auto_discover: true
+
+      # Add more repos as needed:
+      # - name: "domain-loan"
+      #   url: "https://github.ibm.com/sbi-validation/domain-loan.git"
+      #   branches:
+      #     - "main"
+      #     - "develop"
+      #   jobs_subdir: "jobs"
+
+  # REST API Trigger
+  api:
+    enabled: true
+    auth_type: "api_key"
+    auth_header: "X-API-Key"
+
+  # Scheduled Scans
+  scheduler:
+    enabled: false
+    jobs:
+      - name: "nightly_full_scan"
+        cron: "0 2 * * *"
+        paths: "/opt/spark-jobs/**/*.py"
+        priority: 3
+
+# Notifications
+notifications:
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK_URL:}"
+    channels:
+      critical: "#spark-validation-critical"
+      summary: "#spark-validation-summary"
+
+  webhook:
+    enabled: false
+    url: "${NOTIFICATION_WEBHOOK_URL:}"
+    headers:
+      Authorization: "Bearer ${NOTIFICATION_TOKEN:}"
+
+# Spark Execution
+spark:
+  # Spark submit command (use 'spark-submit' if in PATH, or full path)
+  submit_command: "${SPARK_SUBMIT:spark-submit}"
+
+  # Master URL: local[*], yarn, spark://host:7077, k8s://...
+  master: "${SPARK_MASTER:local[*]}"
+
+  # Deploy mode: client or cluster
+  deploy_mode: "client"
+
+  # Driver memory
+  driver_memory: "2g"
+
+  # Executor memory
+  executor_memory: "2g"
+
+  # Additional Spark configurations
+  conf:
+    spark.sql.adaptive.enabled: "true"
+    spark.ui.enabled: "false"
+    spark.driver.extraJavaOptions: "-Dlog4j.configuration=log4j.properties"
+
+  # Execution timeout in seconds (0 = no timeout)
+  timeout_seconds: 600
+
+  # Default parameter sets (can be overridden per job)
+  default_params:
+    GDM_ParameterSet:
+      SSRejectFilePath: "/tmp/spark-validator/rejects"
+    PCS_ParameterSet:
+      JpBusinessDate: "2026-01-01"
+
+# Monitoring
+monitoring:
+  prometheus_enabled: true
+  prometheus_port: 9090
+  health_check_port: 8080
+
+# ==============================================================================
+# AI Configuration (Centralized)
+# Shared AI provider settings for all AI-powered features
+# ==============================================================================
+ai:
+  enabled: true
+
+  # Provider Configuration
+  # All AI features share these providers with fallback support
+  providers:
+    primary: "ollama"        # Local LLM for privacy and cost
+    fallback: "azure-openai" # Cloud fallback for reliability
+
+    # Ollama Configuration (local LLM)
+    ollama:
+      base_url: "${OLLAMA_BASE_URL:http://localhost:11434}"
+      model: "${OLLAMA_MODEL:llama3.1}"
+      timeout_seconds: 120
+
+    # Azure OpenAI Configuration
+    azure_openai:
+      endpoint: "${AZURE_OPENAI_ENDPOINT:}"
+      api_key: "${AZURE_OPENAI_KEY:}"
+      deployment: "${AZURE_OPENAI_DEPLOYMENT:gpt-4}"
+      api_version: "${AZURE_OPENAI_API_VERSION:2024-02-15-preview}"
+      timeout_seconds: 60
+
+    # OpenAI Configuration (optional)
+    openai:
+      api_key: "${OPENAI_API_KEY:}"
+      model: "${OPENAI_MODEL:gpt-4}"
+      timeout_seconds: 60
+
+    # Anthropic Configuration (optional)
+    anthropic:
+      api_key: "${ANTHROPIC_API_KEY:}"
+      model: "${ANTHROPIC_MODEL:claude-3-sonnet}"
+      timeout_seconds: 60
+
+  # Retry Configuration
+  retry:
+    max_attempts: 3
+    delay_seconds: 1.0
+    backoff_multiplier: 2.0
+
+  # ---------------------------------------------------------------------------
+  # Classifier Module - Job Classification
+  # ---------------------------------------------------------------------------
+  classifier:
+    enabled: true
+
+    # Batch Processing
+    batch:
+      max_concurrent_jobs: 5
+      retry_attempts: 2
+      batch_size: 10
+      progress_update_interval: 5
+      queue_key_prefix: "classification:batch:"
+      job_ttl_seconds: 86400
+
+    # Category Discovery
+    category_discovery:
+      enabled: true
+      auto_approve_threshold: 0.9
+      min_occurrences_for_suggestion: 2
+      max_pending_suggestions: 100
+
+    # Complexity Scoring Weights
+    complexity_weights:
+      lines_of_code: 0.1
+      sql_queries: 5
+      joins: 10
+      aggregations: 8
+      transformations: 3
+      dataframes: 2
+      source_tables: 5
+      udfs: 7
+
+    # Complexity Thresholds
+    complexity_thresholds:
+      low: 30
+      medium: 70
+
+    # Storage Settings
+    storage:
+      store_raw_responses: true
+      retention_days: 365
+
+  # ---------------------------------------------------------------------------
+  # Analyzer Module - Code Analysis
+  # ---------------------------------------------------------------------------
+  analyzer:
+    enabled: true
+    max_code_length: 8000
+    analysis_types:
+      - business_logic
+      - data_flow
+      - performance
+      - security
+      - refactoring
+
+  # ---------------------------------------------------------------------------
+  # Syntax Module - Syntax Checking (Future)
+  # ---------------------------------------------------------------------------
+  syntax:
+    enabled: false  # Placeholder for future implementation

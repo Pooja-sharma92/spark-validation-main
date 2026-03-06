@@ -1,0 +1,74 @@
+# Spark Code Analyzer Configuration
+
+# AI Provider Settings (choose one)
+ai_provider:
+  # Option 1: OpenAI
+  type: "openai"
+  api_key: "${OPENAI_API_KEY}"  # Set in environment variable
+  model: "gpt-4"
+
+  # Option 2: Azure OpenAI
+  # type: "azure-openai"
+  # endpoint: "${AZURE_OPENAI_ENDPOINT}"
+  # api_key: "${AZURE_OPENAI_KEY}"
+  # model: "gpt-4"  # Deployment name
+
+  # Option 3: Anthropic Claude
+  # type: "anthropic"
+  # api_key: "${ANTHROPIC_API_KEY}"
+  # model: "claude-3-5-sonnet-20241022"
+
+  # Option 4: Local LLM
+  # type: "ollama"
+  # base_url: "http://localhost:11434"
+  # model: "codellama:13b"
+
+# Analysis Settings
+analysis:
+  # Enable/disable analysis modules
+  modules:
+    static_analysis: true
+    pattern_detection: true
+    data_flow_analysis: true
+    performance_analysis: true
+    ai_deep_analysis: true
+
+  # Severity thresholds
+  thresholds:
+    critical_complexity: 15  # Cyclomatic complexity
+    max_function_lines: 100
+    max_file_lines: 500
+    duplicate_threshold: 6   # Lines to consider duplicate
+
+  # Spark-specific checks
+  spark:
+    check_caching: true
+    check_broadcast_hints: true
+    check_partition_skew: true
+    detect_shuffle_operations: true
+
+# Report Settings
+reporting:
+  output_format: "markdown"  # markdown, html, json
+  output_path: "./analysis_reports"
+  include_code_snippets: true
+  max_snippet_lines: 10
+  generate_visualizations: true  # Data flow diagrams
+
+  # Report sections to include
+  sections:
+    - executive_summary
+    - critical_bugs
+    - data_flow_analysis
+    - performance_analysis
+    - code_quality
+    - security_analysis
+    - recommendations
+
+# Ignore patterns (files to skip)
+ignore:
+  - "*/test/*"
+  - "*/tests/*"
+  - "*/__pycache__/*"
+  - "*.pyc"
+  - ".git/*"

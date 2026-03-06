@@ -1,0 +1,174 @@
+framework:
+  name: "spark-validation"
+  mode: "full"
+  fail_on_execution_error: false
+  log_level: "INFO"
+
+queue:
+  redis_url: "${REDIS_URL:redis://validation-redis:6379/0}"
+  poll_seconds: 5
+  priorities: [P0, P1, P2, P3]
+
+worker:
+  id: "${WORKER_ID:worker-1}"
+  max_jobs: 0
+  temp_dir: "/tmp/spark-validator"
+  create_dirs: true
+
+storage:
+  enabled: true
+  postgres:
+    host: "${POSTGRES_HOST:validation-postgres}"
+    port: ${POSTGRES_PORT:5432}
+    db: "${POSTGRES_DB:validation_results}"
+    user: "${POSTGRES_USER:validator}"
+    password: "${POSTGRES_PASSWORD:validator_secret}"
+    connect_timeout_seconds: 10
+
+spark:
+  pyspark_version: "3.5.1"
+  java_home: "/usr/lib/jvm/java-17-openjdk-amd64"
+
+  local:
+    master: "local[*]"
+    app_name: "spark-validation-executor"
+    warehouse_dir: "/tmp/spark-warehouse"
+    local_dir: "/tmp/spark-local"
+    ivy_dir: "/tmp/ivy"
+
+  conf:
+    spark.sql.warehouse.dir: "/tmp/spark-warehouse"
+    spark.local.dir: "/tmp/spark-local"
+    spark.driver.extraJavaOptions: "-Divy.cache.dir=/tmp/ivy -Divy.home=/tmp/ivy"
+    spark.executor.extraJavaOptions: "-Divy.cache.dir=/tmp/ivy -Divy.home=/tmp/ivy"
+    spark.sql.adaptive.enabled: "true"
+    spark.sql.legacy.timeParserPolicy: "LEGACY"
+
+    # ============================================================
+    # ✅ REQUIRED: Packages for Iceberg + MinIO (Spark uses s3a://)
+    # ============================================================
+    spark.jars.packages: "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.1,org.apache.iceberg:iceberg-aws-bundle:1.10.1,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262"
+
+    # ============================================================
+    # ✅ Iceberg Spark Extensions + Catalog (REST)
+    # NOTE: executor_runner will NOT allow 'spark.sql.catalog.my_catalog.type=hive'
+    # ============================================================
+    spark.sql.extensions: "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+    spark.sql.defaultCatalog: "my_catalog"
+
+    spark.sql.catalog.my_catalog: "org.apache.iceberg.spark.SparkCatalog"
+    spark.sql.catalog.my_catalog.catalog-impl: "org.apache.iceberg.rest.RESTCatalog"
+    spark.sql.catalog.my_catalog.uri: "${ICEBERG_REST_URI:http://iceberg-rest:8181}"
+    spark.sql.catalog.my_catalog.io-impl: "org.apache.iceberg.aws.s3.S3FileIO"
+    spark.sql.catalog.my_catalog.warehouse: "${ICEBERG_WAREHOUSE:s3a://warehouse/}"
+    spark.sql.catalog.my_catalog.s3.endpoint: "${ICEBERG_S3_ENDPOINT:http://minio:9000}"
+    spark.sql.catalog.my_catalog.s3.path-style-access: "true"
+
+    # ============================================================
+    # ✅ Hadoop S3A settings
+    # ============================================================
+    spark.hadoop.fs.s3a.endpoint: "${ICEBERG_S3_ENDPOINT:http://minio:9000}"
+    spark.hadoop.fs.s3a.path.style.access: "true"
+    spark.hadoop.fs.s3a.connection.ssl.enabled: "false"
+    spark.hadoop.fs.s3a.access.key: "${AWS_ACCESS_KEY_ID:admin}"
+    spark.hadoop.fs.s3a.secret.key: "${AWS_SECRET_ACCESS_KEY:password}"
+    spark.hadoop.fs.s3a.impl: "org.apache.hadoop.fs.s3a.S3AFileSystem"
+
+validation:
+  stages:
+    - name: "pre_execution"
+      enabled: true
+      blocking: false
+      timeout_seconds: 120
+
+    - name: "syntax"
+      enabled: true
+      blocking: true
+      timeout_seconds: 60
+
+    - name: "imports"
+      enabled: true
+      blocking: false
+      timeout_seconds: 60
+
+    - name: "sql"
+      enabled: true
+      blocking: true
+      timeout_seconds: 60
+
+    - name: "logic"
+      enabled: true
+      blocking: true
+      timeout_seconds: 60
+
+    - name: "spark_enhanced"
+      enabled: true
+      blocking: false
+      timeout_seconds: 120
+
+    - name: "execution"
+      enabled: true
+      blocking: false
+      timeout_seconds: 600
+
+    - name: "golden_compare"
+      enabled: true
+      blocking: true
+      timeout_seconds: 300
+
+    - name: "iceberg_result"
+      enabled: true
+      blocking: false
+      timeout_seconds: 120
+
+pipeline:
+  stage_settings:
+    execution:
+      dry_mode: false
+      skip_on_missing_table: true
+      skip_on_missing_utils: true
+      skip_on_missing_files: true
+      skip_on_unresolved_udf: true
+
+      # ✅ Approach A2 output capture (no job code changes)
+      output_capture:
+        enabled: true
+        output_root: "/app/reports/outputs"
+        output_layout: "job_request"
+        format: "parquet"
+        mode: "overwrite"
+        var_names: ["final_df", "output_df", "result_df"]
+
+    golden_compare:
+      enabled: true
+      golden_path: "/app/test_assets/golden/data"
+      golden_format: "csv"
+      output_root: "/app/reports/outputs"
+      output_layout: "job_request"
+      output_format: "infer"
+      output_table: ""
+      keys: ["ID"]
+      ignore_cols: []
+      numeric_tol: 0.0
+      fail_on_mismatch: true
+      fail_if_output_missing: true
+      sample_mismatches: 20
+
+    iceberg_result:
+      enabled: true
+      catalog: my_catalog
+      database: validation
+      table: job_runs
+
+params:
+  default_params:
+    Prm_Rej_ParamSet: "/tmp/spark-validator/rejects/prm_rej.json"
+
+# ✅ IMPORTANT: REST-based Iceberg configuration (do NOT use hadoop/hive catalog)
+iceberg:
+  enabled: true
+  catalog_name: my_catalog
+  rest_uri: "${ICEBERG_REST_URI:http://iceberg-rest:8181}"
+  s3_endpoint: "${ICEBERG_S3_ENDPOINT:http://minio:9000}"
+  warehouse: "${ICEBERG_WAREHOUSE:s3a://warehouse/}"
+  aws_region: "${AWS_REGION:us-east-1}"

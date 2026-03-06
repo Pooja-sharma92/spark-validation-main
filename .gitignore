@@ -1,0 +1,80 @@
+# Environment variables
+.env
+src/docker/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Analysis reports (generated)
+src/analyzer/analysis_reports/
+
+# Runtime Data
+data/
+src/docker/data/
+*.parquet
+*.iceberg
+
+# JAR files
+*.jar
+
+# Spark temporary files
+metastore_db/
+derby.log
+
+# Validation framework logs
+validation_logs/
+
+# Node.js / Web
+node_modules/
+**/node_modules/
+src/app/api/node_modules/
+src/app/web/node_modules/
+dist/
+.npm
+.pnpm-store/
+*.tsbuildinfo
+
+# Vite
+*.local
+.venv/
+
+CLAUDE.md

@@ -1,0 +1,45 @@
+# Development Environment Configuration
+# This file overrides base.yaml settings for development
+
+metadata:
+  environment: "dev"
+
+spark:
+  master: "local[4]"  # Run locally with 4 cores
+
+  catalogs:
+    my_catalog:
+      type: "hadoop"  # Use filesystem-based catalog for dev
+      uri: null  # No metastore needed for hadoop catalog
+      warehouse: "file:///tmp/dev-warehouse"  # Local filesystem warehouse
+
+  performance:
+    shuffle_partitions: 50  # Fewer partitions for dev (faster)
+
+databases:
+  source_schema: "dev_ibm_test"
+  dim_schema: "dev_gdmsbi"
+  target_schema: "dev_vibmavpne0"
+
+tables:
+  sources:
+    # Dev can use same table names or mock table names
+    loan_master: "LOAN_MASTER"
+    psl_lookup: "CCOD_LON_PSL"
+    advance_detail: "BLDVAA_UAT"
+    loan_account_detail: "LON_ACCT_DTL_TBL"
+    customer_balance: "CUST_TOT_BALANCE"
+    loan_customer_balance: "LON_CUST_TOT_BALANCE"
+    branch_master: "BRANCH_MASTER_DIM"
+    date_dimension: "DT_DIM"
+
+  target:
+    fact_table: "LON_AGREEMENT_WEEKLY_FACT"
+
+logging:
+  level: "DEBUG"  # More verbose logging for dev
+  log_schemas: true
+  log_row_counts: true
+
+output:
+  reject_file_path: "/tmp/dev-output"

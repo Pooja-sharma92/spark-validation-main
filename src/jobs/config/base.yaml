@@ -1,0 +1,101 @@
+# Base Configuration for STG_XTC_LD_TEST_JOB
+# This file contains shared configuration across all environments
+# Environment-specific overrides are in dev.yaml, test.yaml, prod.yaml
+
+metadata:
+  job_name: "STG_XTC_LD_TEST_JOB"
+  version: "2.0.0"
+  description: "Loan Agreement Weekly Fact ETL Job"
+
+spark:
+  app_name: "STG_XTC_LD_TEST_JOB"
+  master: "yarn"
+
+  # Iceberg Catalog Configuration
+  catalogs:
+    my_catalog:
+      # ✅ IMPORTANT:
+      # Use REST catalog settings (NO Hive metastore) to avoid:
+      # "Cannot create catalog my_catalog, both type and catalog-impl are set: type=hive, ..."
+      # REST endpoint inside your Podman network (override via env if needed)
+      # Iceberg warehouse location
+      warehouse: "${ICEBERG_WAREHOUSE:s3a://warehouse/}"
+
+      cache_enabled: false  # Disable cache if debugging
+      default_catalog: true  # Make this the default catalog
+      write_format: "parquet"
+      write_target_file_size_bytes: 134217728  # 128MB
+      write_metadata_compression_codec: "gzip"
+
+  # Performance Tuning
+  performance:
+    # Adaptive Query Execution (AQE)
+    adaptive_enabled: true
+    adaptive_shuffle_target_post_shuffle_input_size: "64MB"
+    adaptive_coalesce_partitions_enabled: true
+    adaptive_skew_join_enabled: true
+
+    # Shuffle partitioning
+    shuffle_partitions: 200  # Safe default; AQE may override
+    files_max_partition_bytes: 134217728  # 128MB
+    files_open_cost_in_bytes: 4194304  # 4MB
+
+    # SQL Settings
+    case_sensitive: false
+    sources_partition_overwrite_mode: "dynamic"
+    iceberg_merge_schema: true  # For INSERT OVERWRITE on partitioned tables
+
+# Database and Schema Configuration
+databases:
+  source_schema: "IBM_TEST"  # Source database for loan data
+  dim_schema: "GDMSBI"  # Dimension database
+  target_schema: "VIBMAVPNE0"  # Target schema for output
+
+# Table Configuration
+tables:
+  sources:
+    # Source Tables
+    loan_master: "LOAN_MASTER"  # Main loan account table
+    psl_lookup: "CCOD_LON_PSL"  # PSL code lookup table
+    advance_detail: "BLDVAA_UAT"  # Advance detail table
+    loan_account_detail: "LON_ACCT_DTL_TBL"  # Loan account detail
+    customer_balance: "CUST_TOT_BALANCE"  # Customer total balance
+    loan_customer_balance: "LON_CUST_TOT_BALANCE"  # Loan customer balance
+    branch_master: "BRANCH_MASTER_DIM"  # Branch master dimension
+
+    # Dimension Tables
+    date_dimension: "DT_DIM"  # Date dimension table
+
+  target:
+    fact_table: "LON_AGREEMENT_WEEKLY_FACT"  # Target fact table
+
+# Filter and Business Logic Configuration
+filters:
+  # Status codes for loan filtering
+  status_codes: ["10", "40", "45"]
+
+  # Default date values for missing data
+  min_date: "1899-12-31"  # Historical missing date default value (pre-epoch)
+  max_date: "2999-12-31"  # Future date default value (far future)
+
+  # Dimension flags
+  latest_flag: "Y"  # Filter for latest records in dimension tables
+
+  # Table identifiers
+  customer_balance_table_id: 2  # TBL_ID filter for customer balance
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "json"  # Use JSON format for structured logging
+  log_schemas: true  # Log DataFrame schemas
+  log_row_counts: true  # Log row counts for monitoring
+  log_execution_time: true  # Log execution time for each stage
+
+# Output Configuration
+output:
+  # Output paths use runtime parameters: {reject_file_path}/GDM/...
+  reject_file_path: "${REJECT_FILE_PATH}"  # Set via environment variable or command line
+  fact_file_pattern: "GDM_LON_AGMNT_WKLY_FT_{business_date}.parquet"
+  transform_file_pattern: "Trf_GDM_TFR_LON_AGMNT_WKLY_FT_{business_date}.parquet"
+  write_mode: "overwrite"  # Overwrite existing files

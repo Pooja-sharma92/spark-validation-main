@@ -1,0 +1,2 @@
+job_name,metadata_json,yaml,has_yaml,has_output_file_template,has_apt_schema_record,status
+CBS_INVM_CDC_PACKED,metadata/out/CBS_INVM_CDC_PACKED_metadata.json,metadata/generated/CBS_INVM_CDC_PACKED.yaml,True,True,False,PASS

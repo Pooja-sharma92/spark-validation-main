@@ -1,0 +1,5 @@
+{
+  "job_path": "/app/jobs/CBS_INVM_CDC_PACKED.py",
+  "created_at_utc": "2026-02-02T14:08:10Z",
+  "note": "Created by execution_stage to avoid empty output capture folder when job writes via spark.sql (MERGE/INSERT) instead of df.write."
+}
